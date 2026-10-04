@@ -1,4 +1,3 @@
-
 """
 Portal de Jurisprudencia para Suscriptores
 Canal de Jurisprudencia · Nelson Arévalo
@@ -7,6 +6,7 @@ Aplicación web interactiva desarrollada en Streamlit con Buscador Semántico IA
 
 import os
 import io
+import time
 import datetime
 import pandas as pd
 import streamlit as st
@@ -89,10 +89,11 @@ if not GEMINI_API_KEY and "GEMINI_API_KEY" in st.secrets:
 # Lista de modelos soportados para fallback dinámico
 GEMINI_MODELS_FALLBACK = [
     "gemini-3.8-flash",
-    "gemini-3.1-pro-preview",
+    "gemini-2.5-flash-latest",
     "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.5-pro",
     "gemini-pro"
-    
 ]
 
 # ==============================================================================
@@ -182,7 +183,7 @@ def check_login(email_input, password_input):
 if not st.session_state.authenticated:
     col_l1, col_center, col_l2 = st.columns([1, 2, 1])
     with col_center:
-        st.markdown("<h2 class='main-header' style='text-align: center;'>⚖️️ Portal de Jurisprudencia</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 class='main-header' style='text-align: center;'>⚖ Portal de Jurisprudencia</h2>", unsafe_allow_html=True)
         st.markdown("<p class='sub-header' style='text-align: center;'>Acceso exclusivo para suscriptores de la Biblioteca Jurídica</p>", unsafe_allow_html=True)
         
         with st.form("form_login"):
@@ -243,7 +244,7 @@ with st.sidebar:
     st.caption("Biblioteca Jurídica Digital · Google Workspace")
 
 # ==============================================================================
-# 7. MÓDULO 1: BUSCADOR SEMÁNTICO CON IA (GEMINI MULTI-MODEL FALLBACK)
+# 7. MÓDULO 1: BUSCADOR SEMÁNTICO CON IA (GEMINI MULTI-MODEL FALLBACK & RETRY)
 # ==============================================================================
 if menu == "🤖 Buscador Semántico IA":
     st.markdown("<h2 class='main-header'>🤖 Asistente Jurisprudencial con IA</h2>", unsafe_allow_html=True)
@@ -321,15 +322,25 @@ Instrucciones para tu respuesta:
                     
                     errores_modelos = []
                     for name_model in modelos_a_probar:
-                        try:
-                            model = genai.GenerativeModel(name_model)
-                            response = model.generate_content(prompt)
-                            if response and response.text:
-                                respuesta_texto = response.text
-                                modelo_usado = name_model
-                                break
-                        except Exception as em:
-                            errores_modelos.append(f"{name_model}: {em}")
+                        max_retries = 2
+                        for attempt in range(max_retries + 1):
+                            try:
+                                model = genai.GenerativeModel(name_model)
+                                response = model.generate_content(prompt)
+                                if response and response.text:
+                                    respuesta_texto = response.text
+                                    modelo_usado = name_model
+                                    break
+                            except Exception as em:
+                                err_str = str(em)
+                                if "429" in err_str and attempt < max_retries:
+                                    time.sleep(7)
+                                    continue
+                                else:
+                                    errores_modelos.append(f"{name_model}: {em}")
+                                    break
+                        if respuesta_texto:
+                            break
                     
                     if not respuesta_texto:
                         respuesta_texto = f"Error al generar respuesta con los modelos disponibles de Gemini.\n\nDetalles:\n" + "\n".join(errores_modelos)
@@ -470,4 +481,3 @@ elif menu == "👤 Mi Suscripción":
     Ponte en contacto directo con nuestro canal para procesar tu renovación y mantener tu acceso sin interrupciones.
     """)
     st.link_button("📲 Contactar soporte de suscripciones por WhatsApp", "https://wa.me/573000000000?text=Hola,%20deseo%20renovar%20mi%20suscripci%C3%B3n", use_container_width=True)
-
