@@ -85,13 +85,21 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY and "GEMINI_API_KEY" in st.secrets:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
+# Lista de modelos soportados para fallback dinámico
+GEMINI_MODELS_FALLBACK = [
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-pro",
+    "gemini-pro"
+]
+
 # ==============================================================================
 # 3. CARGA DE DATOS DESDE GOOGLE SHEETS
 # ==============================================================================
 @st.cache_data(ttl=300)
 def load_data():
     """Carga los datos de jurisprudencia y de suscriptores."""
-    # Método por exportación CSV directa de Google Sheets (Cero dependencias complejas)
     url_origen = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_TAB_ORIGEN}"
     url_suscriptores = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_TAB_SUSCRIPTORES}"
     
@@ -105,7 +113,6 @@ def load_data():
     try:
         df_subs = pd.read_csv(url_suscriptores)
         df_subs.fillna("", inplace=True)
-        # Normalizar columnas
         df_subs["Email"] = df_subs["Email"].astype(str).str.strip().str.lower()
         df_subs["Password"] = df_subs["Password"].astype(str).str.strip()
     except Exception as e:
@@ -138,7 +145,6 @@ def check_login(email_input, password_input):
     
     user_row = match.iloc[0].to_dict()
     
-    # Verificar estado y vigencia
     estado = str(user_row.get("Estado", "")).strip().lower()
     fecha_vence_str = str(user_row.get("Fecha_Vence", "")).strip()
     
@@ -147,7 +153,6 @@ def check_login(email_input, password_input):
     
     if fecha_vence_str:
         try:
-            # Parsear formatos comunes YYYY-MM-DD o DD/MM/YYYY
             if "-" in fecha_vence_str:
                 parts = [int(p) for p in fecha_vence_str.split("-")]
                 if parts[0] > 1000:
@@ -171,12 +176,12 @@ def check_login(email_input, password_input):
     return True, user_row
 
 # ==============================================================================
-# 5. PANTALLA DE ACCESO (LOGIN) SI NO ESTÁ AUTENTICADO
+# 5. PANTALLA DE ACCESO (LOGIN)
 # ==============================================================================
 if not st.session_state.authenticated:
     col_l1, col_center, col_l2 = st.columns([1, 2, 1])
     with col_center:
-        st.markdown("<h2 class='main-header' style='text-align: center;'>⚖️ Portal de Jurisprudencia</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 class='main-header' style='text-align: center;'>⚖️️ Portal de Jurisprudencia</h2>", unsafe_allow_html=True)
         st.markdown("<p class='sub-header' style='text-align: center;'>Acceso exclusivo para suscriptores de la Biblioteca Jurídica</p>", unsafe_allow_html=True)
         
         with st.form("form_login"):
@@ -237,17 +242,25 @@ with st.sidebar:
     st.caption("Biblioteca Jurídica Digital · Google Workspace")
 
 # ==============================================================================
-# 7. MÓDULO 1: BUSCADOR SEMÁNTICO CON IA (GEMINI)
+# 7. MÓDULO 1: BUSCADOR SEMÁNTICO CON IA (GEMINI MULTI-MODEL FALLBACK)
 # ==============================================================================
 if menu == "🤖 Buscador Semántico IA":
     st.markdown("<h2 class='main-header'>🤖 Asistente Jurisprudencial con IA</h2>", unsafe_allow_html=True)
     st.markdown("<p class='sub-header'>Formula consultas jurídicas en lenguaje natural. La IA analizará la biblioteca y citará las sentencias exactas.</p>", unsafe_allow_html=True)
     
-    consulta_usuario = st.text_area(
-        "¿Qué problema jurídico, regla o tesis deseas consultar?",
-        placeholder="Ejemplo: ¿Cuál es el criterio frente a la sanción disciplinaria cuando las labores no están explícitas en el manual de funciones pero tienen conexidad con el cargo?",
-        height=100
-    )
+    col_input, col_config = st.columns([3, 1])
+    with col_input:
+        consulta_usuario = st.text_area(
+            "¿Qué problema jurídico, regla o tesis deseas consultar?",
+            placeholder="Ejemplo: ¿Cuál es el criterio frente a la sanción disciplinaria cuando las labores no están explícitas en el manual de funciones pero tienen conexidad con el cargo?",
+            height=110
+        )
+    with col_config:
+        modelo_preferido = st.selectbox(
+            "Modelo Gemini preferido",
+            ["Auto (Fallback dinámico)"] + GEMINI_MODELS_FALLBACK,
+            help="Si el modelo seleccionado falla o agota cuota, el sistema probará automáticamente con las opciones alternativas."
+        )
     
     col_btn, col_info = st.columns([1, 4])
     with col_btn:
@@ -260,8 +273,6 @@ if menu == "🤖 Buscador Semántico IA":
             # 1. Preparar el contexto de la base de datos para la IA
             contexto_items = []
             cols_requeridas = ["Corporación", "Sala/Sección", "Tipo providencia", "Radicado", "Fecha providencia", "Tema", "Enlace", "Nombre copia"]
-            
-            # Tomar las columnas existentes
             cols_disp = [c for c in cols_requeridas if c in df_juris.columns]
             
             for idx, row in df_juris.iterrows():
@@ -293,19 +304,39 @@ Instrucciones para tu respuesta:
 3. ENLACES DIRECTOS: Si la providencia tiene un enlace en la lista, indícalo claramente con formato markdown [Ver Providencia](enlace) para que el suscriptor pueda abrir el archivo oficial.
 4. Si la base no contiene un caso idéntico, explica el precedente más cercano disponible sin inventar radicados ni normas.
 """
-            # Llamar a Gemini API
             respuesta_texto = ""
+            modelo_usado = None
+            
             if GEMINI_API_KEY:
                 try:
                     import google.generativeai as genai
                     genai.configure(api_key=GEMINI_API_KEY)
-                    model = genai.GenerativeModel("gemini-1.5-flash")
-                    response = model.generate_content(prompt)
-                    respuesta_texto = response.text
+                    
+                    # Orden de modelos según preferencia del usuario
+                    if modelo_preferido != "Auto (Fallback dinámico)":
+                        modelos_a_probar = [modelo_preferido] + [m for m in GEMINI_MODELS_FALLBACK if m != modelo_preferido]
+                    else:
+                        modelos_a_probar = GEMINI_MODELS_FALLBACK
+                    
+                    errores_modelos = []
+                    for name_model in modelos_a_probar:
+                        try:
+                            model = genai.GenerativeModel(name_model)
+                            response = model.generate_content(prompt)
+                            if response and response.text:
+                                respuesta_texto = response.text
+                                modelo_usado = name_model
+                                break
+                        except Exception as em:
+                            errores_modelos.append(f"{name_model}: {em}")
+                    
+                    if not respuesta_texto:
+                        respuesta_texto = f"Error al generar respuesta con los modelos disponibles de Gemini.\n\nDetalles:\n" + "\n".join(errores_modelos)
+                        
                 except Exception as e:
-                    respuesta_texto = f"Error al consultar la API de Gemini: {e}\n\nAsegúrate de haber configurado tu GEMINI_API_KEY en los Secrets de Streamlit."
+                    respuesta_texto = f"Error general al consultar la API de Gemini: {e}\n\nAsegúrate de haber configurado tu GEMINI_API_KEY en los Secrets de Streamlit."
             else:
-                # Modo demostración / Fallback si aún no han configurado la clave
+                # Modo demostración / Fallback local por palabras clave
                 respuesta_texto = f"""
 ### 💡 Análisis Preliminar (Modo Demostración - Sin API Key configurada)
 
@@ -327,6 +358,8 @@ Para activar el análisis dinámico en tiempo real con Gemini, agrega tu `GEMINI
 
             # Mostrar respuesta
             st.markdown("<div class='card-ia'>", unsafe_allow_html=True)
+            if modelo_usado:
+                st.caption(f"⚡ *Respuesta generada mediante Gemini (`{modelo_usado}`)*")
             st.markdown(respuesta_texto)
             st.markdown("</div>", unsafe_allow_html=True)
 
