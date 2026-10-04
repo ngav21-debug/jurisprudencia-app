@@ -1,3 +1,4 @@
+
 """
 Portal de Jurisprudencia para Suscriptores
 Canal de Jurisprudencia · Nelson Arévalo
@@ -87,11 +88,11 @@ if not GEMINI_API_KEY and "GEMINI_API_KEY" in st.secrets:
 
 # Lista de modelos soportados para fallback dinámico
 GEMINI_MODELS_FALLBACK = [
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-pro",
+    "gemini-3.8-flash",
+    "gemini-3.1-pro-preview",
+    "gemini-2.5-flash",
     "gemini-pro"
+    
 ]
 
 # ==============================================================================
@@ -469,3 +470,4 @@ elif menu == "👤 Mi Suscripción":
     Ponte en contacto directo con nuestro canal para procesar tu renovación y mantener tu acceso sin interrupciones.
     """)
     st.link_button("📲 Contactar soporte de suscripciones por WhatsApp", "https://wa.me/573000000000?text=Hola,%20deseo%20renovar%20mi%20suscripci%C3%B3n", use_container_width=True)
+
