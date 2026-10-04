@@ -8,56 +8,24 @@ import os
 import io
 import time
 import datetime
+import urllib.parse
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ==============================================================================
 # 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS
 # ==============================================================================
 st.set_page_config(
-    page_title="Portal de Jurisprudencia | Nelson Arévalo",
+    page_title="Portal de Jurisprudencia | Suscriptores",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS personalizados con la Identidad Visual Oficial
+# Estilos CSS personalizados
 st.markdown("""
 <style>
-    /* Fondo General Marfil */
-    .stApp {
-        background-color: #F7F5EF;
-    }
-    
-    /* Banner Institucional Superior */
-    .banner-header {
-        background-color: #03053A;
-        color: #FFFFFF;
-        padding: 24px 30px;
-        border-radius: 10px;
-        border-bottom: 5px solid #F2B544;
-        margin-bottom: 25px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        box-shadow: 0 4px 12px rgba(3,5,58,0.15);
-    }
-    .banner-title {
-        font-family: 'Georgia', 'Times New Roman', serif;
-        font-size: 2.2rem;
-        font-weight: 700;
-        color: #FFFFFF;
-        margin: 0;
-    }
-    .banner-subtitle {
-        color: #F2B544;
-        font-size: 1.1rem;
-        margin-top: 4px;
-        margin-bottom: 0;
-        font-weight: 500;
-    }
-    
-    /* Titulares Generales */
     .main-header {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #03053A;
@@ -70,69 +38,42 @@ st.markdown("""
         margin-top: -5px;
         margin-bottom: 20px;
     }
-    
-    /* Tarjeta de Providencias */
     .card-providencia {
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0;
         border-left: 5px solid #03053A;
         border-radius: 8px;
-        padding: 18px;
+        padding: 16px;
         margin-bottom: 14px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
-    
-    /* Tarjeta de IA estilo Ratio Decidendi */
     .card-ia {
-        background-color: #FFFFFF;
+        background-color: #F8FAFC;
         border: 1px solid #CBD5E1;
-        border-left: 6px solid #F2B544;
+        border-left: 5px solid #F2B544;
         border-radius: 8px;
-        padding: 22px;
-        margin-bottom: 22px;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+        padding: 18px;
+        margin-bottom: 20px;
     }
-    .ratio-header {
-        color: #03053A;
-        font-family: 'Georgia', serif;
-        border-bottom: 2px solid #F2B544;
-        padding-bottom: 6px;
-        margin-bottom: 14px;
-    }
-    
-    /* Etiquetas y Badges */
     .tag-corp {
         display: inline-block;
-        background-color: #03053A;
-        color: #FFFFFF;
+        background-color: #EBF8FF;
+        color: #2B6CB0;
         font-size: 0.8rem;
         font-weight: 600;
-        padding: 4px 10px;
+        padding: 3px 8px;
         border-radius: 4px;
         margin-right: 6px;
     }
     .tag-fecha {
         display: inline-block;
-        background-color: #3D8FD6;
-        color: #FFFFFF;
+        background-color: #EDF2F7;
+        color: #4A5568;
         font-size: 0.8rem;
-        padding: 4px 10px;
+        padding: 3px 8px;
         border-radius: 4px;
     }
 </style>
-""", unsafe_allow_html=True)
-
-# Renderizado del Banner Institucional Oficial
-st.markdown("""
-<div class='banner-header'>
-    <div>
-        <h1 class='banner-title'>⚖️ CANAL DE JURISPRUDENCIA</h1>
-        <p class='banner-subtitle'>Biblioteca Jurídica Digital & Buscador Inteligente · Nelson Arévalo</p>
-    </div>
-    <div style='text-align: right; color: #F2B544; font-weight: bold;'>
-        Portal Suscriptores
-    </div>
-</div>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
@@ -150,15 +91,31 @@ if not GEMINI_API_KEY and "GEMINI_API_KEY" in st.secrets:
 # Lista de modelos soportados para fallback dinámico
 GEMINI_MODELS_FALLBACK = [
     "gemini-3.8-flash",
-    "gemini-2.5-flash-latest",
-    "gemini-2.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash",
     "gemini-2.0-flash",
-    "gemini-2.5-pro",
+    "gemini-1.5-pro",
     "gemini-pro"
 ]
 
 # ==============================================================================
-# 3. CARGA DE DATOS DESDE GOOGLE SHEETS
+# 3. FUNCIONES DE UTILIDAD
+# ==============================================================================
+def get_embed_url(url):
+    """Convierte un enlace estándar de Google Drive en una URL apta para iframe en modo vista previa."""
+    if not url:
+        return ""
+    if "drive.google.com" in url and "/view" in url:
+        return url.replace("/view", "/preview")
+    elif "drive.google.com" in url and "/edit" in url:
+        return url.replace("/edit", "/preview")
+    elif "drive.google.com" in url and "id=" in url and "/preview" not in url:
+        file_id = url.split("id=")[1].split("&")[0]
+        return f"https://drive.google.com/file/d/{file_id}/preview"
+    return url
+
+# ==============================================================================
+# 4. CARGA DE DATOS DESDE GOOGLE SHEETS
 # ==============================================================================
 @st.cache_data(ttl=300)
 def load_data():
@@ -187,12 +144,18 @@ def load_data():
 df_juris, df_subs = load_data()
 
 # ==============================================================================
-# 4. GESTIÓN DE SESIÓN Y AUTENTICACIÓN
+# 5. GESTIÓN DE SESIÓN Y AUTENTICACIÓN
 # ==============================================================================
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "user_info" not in st.session_state:
     st.session_state.user_info = None
+if "favoritos" not in st.session_state:
+    st.session_state.favoritos = []
+if "pdf_preview_url" not in st.session_state:
+    st.session_state.pdf_preview_url = None
+if "consulta_input" not in st.session_state:
+    st.session_state.consulta_input = ""
 
 def check_login(email_input, password_input):
     email_clean = email_input.strip().lower()
@@ -239,13 +202,13 @@ def check_login(email_input, password_input):
     return True, user_row
 
 # ==============================================================================
-# 5. PANTALLA DE ACCESO (LOGIN)
+# 6. PANTALLA DE ACCESO (LOGIN)
 # ==============================================================================
 if not st.session_state.authenticated:
     col_l1, col_center, col_l2 = st.columns([1, 2, 1])
     with col_center:
-        st.markdown("<h2 class='main-header' style='text-align: center;'>⚖ Acceso a Suscriptores</h2>", unsafe_allow_html=True)
-        st.markdown("<p class='sub-header' style='text-align: center;'>Canal de Jurisprudencia · Nelson Arévalo</p>", unsafe_allow_html=True)
+        st.markdown("<h2 class='main-header' style='text-align: center;'>⚖ Portal de Jurisprudencia</h2>", unsafe_allow_html=True)
+        st.markdown("<p class='sub-header' style='text-align: center;'>Acceso exclusivo para suscriptores de la Biblioteca Jurídica</p>", unsafe_allow_html=True)
         
         with st.form("form_login"):
             st.subheader("Iniciar Sesión")
@@ -280,12 +243,11 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ==============================================================================
-# 6. ENTORNO AUTENTICADO: BARRA LATERAL Y NAVEGACIÓN
+# 7. ENTORNO AUTENTICADO: BARRA LATERAL Y NAVEGACIÓN
 # ==============================================================================
 user = st.session_state.user_info
 with st.sidebar:
-    st.markdown("### 🏛️ **Nelson Arévalo**")
-    st.markdown("Canal de Jurisprudencia")
+    st.markdown("### 🏛️ **Canal de Jurisprudencia**")
     st.markdown(f"**Usuario:** {user.get('Nombre_Completo', 'Suscriptor')}")
     st.markdown(f"**Plan:** `{user.get('Plan', 'Activo')}`")
     st.markdown(f"**Vence:** `{user.get('Fecha_Vence', 'Vigente')}`")
@@ -298,28 +260,46 @@ with st.sidebar:
     st.markdown("---")
     menu = st.radio(
         "Navegación",
-        ["🤖 Buscador Semántico IA", "📚 Catálogo de Providencias", "👤 Mi Suscripción"],
+        ["🤖 Buscador Semántico IA", "📚 Catálogo de Providencias", "⭐ Mis Guardados / Favoritos", "👤 Mi Suscripción"],
         index=0
     )
     
     st.markdown("---")
-    st.caption("Biblioteca Jurídica Digital · Nelson Arévalo")
+    st.caption("Biblioteca Jurídica Digital · Google Workspace")
 
 # ==============================================================================
-# 7. MÓDULO 1: BUSCADOR SEMÁNTICO CON IA (GEMINI MULTI-MODEL FALLBACK & RETRY)
+# 8. MÓDULO 1: BUSCADOR SEMÁNTICO CON IA (GEMINI MULTI-MODEL FALLBACK & RETRY)
 # ==============================================================================
 if menu == "🤖 Buscador Semántico IA":
     st.markdown("<h2 class='main-header'>🤖 Asistente Jurisprudencial con IA</h2>", unsafe_allow_html=True)
-    st.markdown("<p class='sub-header'>Formula consultas jurídicas en lenguaje natural. La IA analizará la biblioteca y estructurará la Ratio Decidendi con citas exactas.</p>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-header'>Formula consultas jurídicas en lenguaje natural. La IA analizará la biblioteca y citará las sentencias exactas.</p>", unsafe_allow_html=True)
     
+    # Píldoras de Preguntas Frecuentes
+    st.markdown("**Consultas frecuentes de ejemplo:**")
+    pildoras = [
+        "Sanción disciplinaria por funciones no explícitas",
+        "Prescripción de la acción disciplinaria",
+        "Debido proceso en juzgamiento administrativo",
+        "Alcance de la culpa gravísima"
+    ]
+    col_p1, col_p2, col_p3, col_p4 = st.columns(4)
+    cols_p = [col_p1, col_p2, col_p3, col_p4]
+    for idx, pildora in enumerate(pildoras):
+        if cols_p[idx].button(f"💡 {pildora}", key=f"pildora_{idx}", use_container_width=True):
+            st.session_state.consulta_input = pildora
+            st.rerun()
+            
     col_input, col_config = st.columns([3, 1])
     with col_input:
         consulta_usuario = st.text_area(
             "¿Qué problema jurídico, regla o tesis deseas consultar?",
+            value=st.session_state.get("consulta_input", ""),
             placeholder="Ejemplo: ¿Cuál es el criterio frente a la sanción disciplinaria cuando las labores no están explícitas en el manual de funciones pero tienen conexidad con el cargo?",
             height=110
         )
     with col_config:
+        corps_ia = ["Todas"] + sorted([c for c in df_juris["Corporación"].unique() if c])
+        filtro_corp_ia = st.selectbox("Filtrar por Corporación", corps_ia)
         modelo_preferido = st.selectbox(
             "Modelo Gemini preferido",
             ["Auto (Fallback dinámico)"] + GEMINI_MODELS_FALLBACK,
@@ -333,13 +313,16 @@ if menu == "🤖 Buscador Semántico IA":
         st.caption("El análisis evalúa corporación, radicado, fecha, tema y la argumentación registrada en la biblioteca.")
 
     if ejecutar_ia and consulta_usuario.strip():
-        with st.spinner("Analizando jurisprudencia y construyendo Ratio Decidendi..."):
-            # 1. Preparar el contexto de la base de datos para la IA
+        with st.spinner("Analizando jurisprudencia y construyendo respuesta fundamentada..."):
+            df_contexto = df_juris.copy()
+            if filtro_corp_ia != "Todas":
+                df_contexto = df_contexto[df_contexto["Corporación"] == filtro_corp_ia]
+                
             contexto_items = []
             cols_requeridas = ["Corporación", "Sala/Sección", "Tipo providencia", "Radicado", "Fecha providencia", "Tema", "Enlace", "Nombre copia"]
-            cols_disp = [c for c in cols_requeridas if c in df_juris.columns]
+            cols_disp = [c for c in cols_requeridas if c in df_contexto.columns]
             
-            for idx, row in df_juris.iterrows():
+            for idx, row in df_contexto.iterrows():
                 corp = row.get("Corporación", "")
                 rad = row.get("Radicado", "")
                 fecha = row.get("Fecha providencia", "")
@@ -350,10 +333,10 @@ if menu == "🤖 Buscador Semántico IA":
                 if tema or rad:
                     contexto_items.append(f"• [{corp}] Radicado: {rad} | Fecha: {fecha} | Tema: {tema} | Documento: {nombre} | Link: {link}")
             
-            contexto_texto = "\n".join(contexto_items[:120])  # Primeras 120 providencias más relevantes
+            contexto_texto = "\n".join(contexto_items[:120])
             
             prompt = f"""
-Eres el Asistente Jurídico Oficial del Canal de Jurisprudencia de Nelson Arévalo, experto en derecho público, disciplinario y contencioso administrativo en Colombia.
+Eres un asistente jurídico experto en derecho público, disciplinario y contencioso administrativo en Colombia.
 Analiza la siguiente pregunta del usuario y responde FUNDAMENTÁNDOTE ESTRICTAMENTE en la base de datos de providencias suministrada.
 
 Pregunta del usuario:
@@ -362,12 +345,11 @@ Pregunta del usuario:
 Base de Providencias y Doctrina Disponible:
 {contexto_texto}
 
-Instrucciones para la estructura de tu respuesta (Estilo Ratio Decidendi):
-1. RATIO DECIDENDI / TESIS CENTRAL: Explica de manera sintética, rigurosa y técnica la Regla de Decisión aplicable al caso.
-2. ANÁLISIS JURÍDICO DETALLADO: Desarrolla el fundamento dogmático y constitucional del problema planteado.
-3. PRECEDENTES APLICABLES (CITAS DIRECTAS): Cita expresamente las providencias que respaldan la tesis (Corporación, Radicado, Fecha y Tema).
-4. ENLACES OFICIALES: Incluye los enlaces en formato [Ver Providencia](enlace) para acceder al documento en Drive.
-5. Si la base no contiene un caso idéntico, explica el precedente más cercano disponible sin inventar radicados ni normas.
+Instrucciones para tu respuesta:
+1. SÍNTESIS JURÍDICA: Explica con claridad técnica y rigor la tesis jurídica aplicable a la consulta.
+2. PROVIDENCIAS FUNDAMENTO: Cita de forma expresa las providencias de la lista que respaldan tu respuesta (menciona Corporación, Radicado, Fecha y Tema).
+3. ENLACES DIRECTOS: Si la providencia tiene un enlace en la lista, indícalo claramente con formato markdown [Ver Providencia](enlace) para que el suscriptor pueda abrir el archivo oficial.
+4. Si la base no contiene un caso idéntico, explica el precedente más cercano disponible sin inventar radicados ni normas.
 """
             respuesta_texto = ""
             modelo_usado = None
@@ -377,7 +359,6 @@ Instrucciones para la estructura de tu respuesta (Estilo Ratio Decidendi):
                     import google.generativeai as genai
                     genai.configure(api_key=GEMINI_API_KEY)
                     
-                    # Orden de modelos según preferencia del usuario
                     if modelo_preferido != "Auto (Fallback dinámico)":
                         modelos_a_probar = [modelo_preferido] + [m for m in GEMINI_MODELS_FALLBACK if m != modelo_preferido]
                     else:
@@ -411,7 +392,6 @@ Instrucciones para la estructura de tu respuesta (Estilo Ratio Decidendi):
                 except Exception as e:
                     respuesta_texto = f"Error general al consultar la API de Gemini: {e}\n\nAsegúrate de haber configurado tu GEMINI_API_KEY en los Secrets de Streamlit."
             else:
-                # Modo demostración / Fallback local por palabras clave
                 respuesta_texto = f"""
 ### 💡 Análisis Preliminar (Modo Demostración - Sin API Key configurada)
 
@@ -421,7 +401,7 @@ Para activar el análisis dinámico en tiempo real con Gemini, agrega tu `GEMINI
 """
                 palabras = [p.lower() for p in consulta_usuario.split() if len(p) > 3]
                 matches = []
-                for _, row in df_juris.iterrows():
+                for _, row in df_contexto.iterrows():
                     score = sum(1 for p in palabras if p in str(row.get("Tema", "")).lower() or p in str(row.get("Nombre", "")).lower())
                     if score > 0:
                         matches.append((score, row))
@@ -431,40 +411,33 @@ Para activar el análisis dinámico en tiempo real con Gemini, agrega tu `GEMINI
                     link = m.get('Enlace', '#')
                     respuesta_texto += f"\n* **{m.get('Corporación')}** - Rad. `{m.get('Radicado')}` ({m.get('Fecha providencia')}): {m.get('Tema')} — [Abrir Documento en Drive]({link})"
 
-            # Mostrar respuesta estructurada como Ratio Decidendi
             st.markdown("<div class='card-ia'>", unsafe_allow_html=True)
-            st.markdown("<h3 class='ratio-header'>📌 Ratio Decidendi & Anotación Jurisprudencial</h3>", unsafe_allow_html=True)
             if modelo_usado:
-                st.caption(f"⚡ *Análisis generado mediante Gemini (`{modelo_usado}`) · Canal de Jurisprudencia*")
+                st.caption(f"⚡ *Respuesta generada mediante Gemini (`{modelo_usado}`)*")
             st.markdown(respuesta_texto)
             st.markdown("</div>", unsafe_allow_html=True)
 
 # ==============================================================================
-# 8. MÓDULO 2: CATÁLOGO DE PROVIDENCIAS Y FILTROS
+# 9. MÓDULO 2: CATÁLOGO DE PROVIDENCIAS Y FILTROS CON VISOR Y PAGINACIÓN
 # ==============================================================================
 elif menu == "📚 Catálogo de Providencias":
     st.markdown("<h2 class='main-header'>📚 Biblioteca de Jurisprudencia</h2>", unsafe_allow_html=True)
     st.markdown("<p class='sub-header'>Explora y filtra las sentencias, autos y conceptos oficiales clasificados.</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns(3)
-    
-    # Filtro Corporación
     corps = ["Todas"] + sorted([c for c in df_juris["Corporación"].unique() if c])
     with col1:
         filtro_corp = st.selectbox("Corporación", corps)
         
-    # Filtro Tipo Providencia
     tipos = ["Todos"]
     if "Tipo providencia" in df_juris.columns:
         tipos += sorted([t for t in df_juris["Tipo providencia"].unique() if t])
     with col2:
         filtro_tipo = st.selectbox("Tipo de Providencia", tipos)
         
-    # Filtro de búsqueda por texto
     with col3:
         filtro_texto = st.text_input("Buscar por tema, radicado o palabra", placeholder="Ej: debido proceso, sanción...")
         
-    # Aplicar filtros
     df_filtrado = df_juris.copy()
     if filtro_corp != "Todas":
         df_filtrado = df_filtrado[df_filtrado["Corporación"] == filtro_corp]
@@ -481,39 +454,126 @@ elif menu == "📚 Catálogo de Providencias":
 
     st.markdown(f"**Resultados encontrados:** `{len(df_filtrado)}` providencias")
     
-    # Visualización en formato tarjetas
-    for idx, row in df_filtrado.iterrows():
-        corp = row.get("Corporación", "General")
-        sala = row.get("Sala/Sección", "")
-        tipo = row.get("Tipo providencia", "Providencia")
-        rad = row.get("Radicado", "S/R")
-        fecha = row.get("Fecha providencia", "S/F")
-        tema = row.get("Tema", "Sin tema registrado")
-        enlace = row.get("Enlace", "")
-        nombre_copia = row.get("Nombre copia", row.get("Nombre", ""))
+    # Paginación de 10 en 10
+    ITEMS_PER_PAGE = 10
+    total_items = len(df_filtrado)
+    total_pages = max(1, (total_items + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+    pagina_actual = st.number_input("Página", min_value=1, max_value=total_pages, value=1, step=1)
+    
+    start_idx = (pagina_actual - 1) * ITEMS_PER_PAGE
+    end_idx = start_idx + ITEMS_PER_PAGE
+    df_page = df_filtrado.iloc[start_idx:end_idx]
+    
+    # Disposición en pantalla dividida o completa según visor activo
+    if st.session_state.pdf_preview_url:
+        col_list, col_pdf = st.columns([1, 1])
+    else:
+        col_list = st.container()
+        col_pdf = None
         
-        with st.container():
-            st.markdown(f"""
-            <div class='card-providencia'>
-                <div style='margin-bottom: 8px;'>
-                    <span class='tag-corp'>{corp}</span>
-                    <span class='tag-fecha'>📅 {fecha}</span>
-                    <span style='color: #4A5568; font-size: 0.85rem; margin-left: 8px; font-weight: 500;'>{tipo} · {sala}</span>
-                </div>
-                <h4 style='color: #03053A; margin-top: 8px; margin-bottom: 6px; font-family: Georgia, serif;'>Radicado: {rad}</h4>
-                <p style='color: #2D3748; font-size: 0.95rem; margin-bottom: 8px;'><strong>Tema:</strong> {tema}</p>
-                <div style='font-size: 0.82rem; color: #718096;'>
-                    <strong>Archivo:</strong> {nombre_copia}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+    with col_list:
+        for idx, row in df_page.iterrows():
+            corp = row.get("Corporación", "General")
+            sala = row.get("Sala/Sección", "")
+            tipo = row.get("Tipo providencia", "Providencia")
+            rad = row.get("Radicado", "S/R")
+            fecha = row.get("Fecha providencia", "S/F")
+            tema = row.get("Tema", "Sin tema registrado")
+            enlace = row.get("Enlace", "")
+            nombre_copia = row.get("Nombre copia", row.get("Nombre", ""))
             
-            if enlace:
-                st.link_button(f"📄 Abrir PDF en Google Drive ({rad})", enlace)
-            st.write("")
+            with st.container():
+                st.markdown(f"""
+                <div class='card-providencia'>
+                    <div>
+                        <span class='tag-corp'>{corp}</span>
+                        <span class='tag-fecha'>📅 {fecha}</span>
+                        <span style='color: #718096; font-size: 0.85rem; margin-left: 8px;'>{tipo} · {sala}</span>
+                    </div>
+                    <h4 style='color: #1A202C; margin-top: 8px; margin-bottom: 6px;'>Radicado: {rad}</h4>
+                    <p style='color: #2D3748; font-size: 0.95rem; margin-bottom: 8px;'><strong>Tema:</strong> {tema}</p>
+                    <div style='font-size: 0.82rem; color: #718096;'>
+                        <strong>Archivo:</strong> {nombre_copia}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                bcol1, bcol2, bcol3, bcol4 = st.columns(4)
+                with bcol1:
+                    if enlace:
+                        if st.button("👁️ Ver", key=f"btn_prev_{idx}", use_container_width=True):
+                            st.session_state.pdf_preview_url = get_embed_url(enlace)
+                            st.rerun()
+                with bcol2:
+                    if enlace:
+                        st.link_button("📄 Drive", enlace, use_container_width=True)
+                with bcol3:
+                    es_fav = str(rad) in [str(f.get("Radicado")) for f in st.session_state.favoritos]
+                    btn_fav_label = "❤️" if es_fav else "⭐ Guardar"
+                    if st.button(btn_fav_label, key=f"btn_fav_{idx}", use_container_width=True):
+                        if es_fav:
+                            st.session_state.favoritos = [f for f in st.session_state.favoritos if str(f.get("Radicado")) != str(rad)]
+                        else:
+                            st.session_state.favoritos.append(row.to_dict())
+                        st.rerun()
+                with bcol4:
+                    msg_wa = f"Providencia {corp} Rad. {rad} ({fecha}) - Tema: {tema} | Link: {enlace}"
+                    wa_url = f"https://wa.me/?text={urllib.parse.quote(msg_wa)}"
+                    st.link_button("📲 WhatsApp", wa_url, use_container_width=True)
+                st.write("")
+
+    if col_pdf and st.session_state.pdf_preview_url:
+        with col_pdf:
+            st.markdown("### 📄 Visor de Providencia")
+            if st.button("❌ Cerrar visor", use_container_width=True):
+                st.session_state.pdf_preview_url = None
+                st.rerun()
+            components.iframe(st.session_state.pdf_preview_url, height=750, scrolling=True)
 
 # ==============================================================================
-# 9. MÓDULO 3: MI SUSCRIPCIÓN
+# 10. MÓDULO 3: MIS GUARDADOS / FAVORITOS
+# ==============================================================================
+elif menu == "⭐ Mis Guardados / Favoritos":
+    st.markdown("<h2 class='main-header'>⭐ Mis Providencias Guardadas</h2>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-header'>Lista de sentencias y decisiones guardadas para consulta rápida en tu sesión.</p>", unsafe_allow_html=True)
+    
+    if not st.session_state.favoritos:
+        st.info("Aún no has guardado providencias en tus favoritos. Explora el catálogo o realiza búsquedas con la IA y haz clic en '⭐ Guardar'.")
+    else:
+        for idx, row in enumerate(st.session_state.favoritos):
+            corp = row.get("Corporación", "General")
+            sala = row.get("Sala/Sección", "")
+            tipo = row.get("Tipo providencia", "Providencia")
+            rad = row.get("Radicado", "S/R")
+            fecha = row.get("Fecha providencia", "S/F")
+            tema = row.get("Tema", "Sin tema registrado")
+            enlace = row.get("Enlace", "")
+            
+            with st.container():
+                st.markdown(f"""
+                <div class='card-providencia'>
+                    <div>
+                        <span class='tag-corp'>{corp}</span>
+                        <span class='tag-fecha'>📅 {fecha}</span>
+                        <span style='color: #718096; font-size: 0.85rem; margin-left: 8px;'>{tipo} · {sala}</span>
+                    </div>
+                    <h4 style='color: #1A202C; margin-top: 8px; margin-bottom: 6px;'>Radicado: {rad}</h4>
+                    <p style='color: #2D3748; font-size: 0.95rem; margin-bottom: 8px;'><strong>Tema:</strong> {tema}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                fcol1, fcol2 = st.columns(2)
+                with fcol1:
+                    if enlace:
+                        st.link_button("📄 Abrir PDF", enlace, use_container_width=True)
+                with fcol2:
+                    if st.button("🗑️ Eliminar de Favoritos", key=f"del_fav_{idx}", use_container_width=True):
+                        st.session_state.favoritos.pop(idx)
+                        st.rerun()
+                st.write("")
+
+# ==============================================================================
+# 11. MÓDULO 4: MI SUSCRIPCIÓN
 # ==============================================================================
 elif menu == "👤 Mi Suscripción":
     st.markdown("<h2 class='main-header'>👤 Estado de tu Suscripción</h2>", unsafe_allow_html=True)
