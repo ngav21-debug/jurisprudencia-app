@@ -15,15 +15,49 @@ import streamlit as st
 # 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS
 # ==============================================================================
 st.set_page_config(
-    page_title="Portal de Jurisprudencia | Suscriptores",
+    page_title="Portal de Jurisprudencia | Nelson Arévalo",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS personalizados
+# Estilos CSS personalizados con la Identidad Visual Oficial
 st.markdown("""
 <style>
+    /* Fondo General Marfil */
+    .stApp {
+        background-color: #F7F5EF;
+    }
+    
+    /* Banner Institucional Superior */
+    .banner-header {
+        background-color: #03053A;
+        color: #FFFFFF;
+        padding: 24px 30px;
+        border-radius: 10px;
+        border-bottom: 5px solid #F2B544;
+        margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 4px 12px rgba(3,5,58,0.15);
+    }
+    .banner-title {
+        font-family: 'Georgia', 'Times New Roman', serif;
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #FFFFFF;
+        margin: 0;
+    }
+    .banner-subtitle {
+        color: #F2B544;
+        font-size: 1.1rem;
+        margin-top: 4px;
+        margin-bottom: 0;
+        font-weight: 500;
+    }
+    
+    /* Titulares Generales */
     .main-header {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #03053A;
@@ -36,42 +70,69 @@ st.markdown("""
         margin-top: -5px;
         margin-bottom: 20px;
     }
+    
+    /* Tarjeta de Providencias */
     .card-providencia {
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0;
         border-left: 5px solid #03053A;
         border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 14px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .card-ia {
-        background-color: #F8FAFC;
-        border: 1px solid #CBD5E1;
-        border-left: 5px solid #F2B544;
-        border-radius: 8px;
         padding: 18px;
-        margin-bottom: 20px;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.04);
     }
+    
+    /* Tarjeta de IA estilo Ratio Decidendi */
+    .card-ia {
+        background-color: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        border-left: 6px solid #F2B544;
+        border-radius: 8px;
+        padding: 22px;
+        margin-bottom: 22px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+    }
+    .ratio-header {
+        color: #03053A;
+        font-family: 'Georgia', serif;
+        border-bottom: 2px solid #F2B544;
+        padding-bottom: 6px;
+        margin-bottom: 14px;
+    }
+    
+    /* Etiquetas y Badges */
     .tag-corp {
         display: inline-block;
-        background-color: #EBF8FF;
-        color: #2B6CB0;
+        background-color: #03053A;
+        color: #FFFFFF;
         font-size: 0.8rem;
         font-weight: 600;
-        padding: 3px 8px;
+        padding: 4px 10px;
         border-radius: 4px;
         margin-right: 6px;
     }
     .tag-fecha {
         display: inline-block;
-        background-color: #EDF2F7;
-        color: #4A5568;
+        background-color: #3D8FD6;
+        color: #FFFFFF;
         font-size: 0.8rem;
-        padding: 3px 8px;
+        padding: 4px 10px;
         border-radius: 4px;
     }
 </style>
+""", unsafe_allow_html=True)
+
+# Renderizado del Banner Institucional Oficial
+st.markdown("""
+<div class='banner-header'>
+    <div>
+        <h1 class='banner-title'>⚖️ CANAL DE JURISPRUDENCIA</h1>
+        <p class='banner-subtitle'>Biblioteca Jurídica Digital & Buscador Inteligente · Nelson Arévalo</p>
+    </div>
+    <div style='text-align: right; color: #F2B544; font-weight: bold;'>
+        Portal Suscriptores
+    </div>
+</div>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
@@ -183,8 +244,8 @@ def check_login(email_input, password_input):
 if not st.session_state.authenticated:
     col_l1, col_center, col_l2 = st.columns([1, 2, 1])
     with col_center:
-        st.markdown("<h2 class='main-header' style='text-align: center;'>⚖ Portal de Jurisprudencia</h2>", unsafe_allow_html=True)
-        st.markdown("<p class='sub-header' style='text-align: center;'>Acceso exclusivo para suscriptores de la Biblioteca Jurídica</p>", unsafe_allow_html=True)
+        st.markdown("<h2 class='main-header' style='text-align: center;'>⚖ Acceso a Suscriptores</h2>", unsafe_allow_html=True)
+        st.markdown("<p class='sub-header' style='text-align: center;'>Canal de Jurisprudencia · Nelson Arévalo</p>", unsafe_allow_html=True)
         
         with st.form("form_login"):
             st.subheader("Iniciar Sesión")
@@ -223,7 +284,8 @@ if not st.session_state.authenticated:
 # ==============================================================================
 user = st.session_state.user_info
 with st.sidebar:
-    st.markdown("### 🏛️ **Canal de Jurisprudencia**")
+    st.markdown("### 🏛️ **Nelson Arévalo**")
+    st.markdown("Canal de Jurisprudencia")
     st.markdown(f"**Usuario:** {user.get('Nombre_Completo', 'Suscriptor')}")
     st.markdown(f"**Plan:** `{user.get('Plan', 'Activo')}`")
     st.markdown(f"**Vence:** `{user.get('Fecha_Vence', 'Vigente')}`")
@@ -241,14 +303,14 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.caption("Biblioteca Jurídica Digital · Google Workspace")
+    st.caption("Biblioteca Jurídica Digital · Nelson Arévalo")
 
 # ==============================================================================
 # 7. MÓDULO 1: BUSCADOR SEMÁNTICO CON IA (GEMINI MULTI-MODEL FALLBACK & RETRY)
 # ==============================================================================
 if menu == "🤖 Buscador Semántico IA":
     st.markdown("<h2 class='main-header'>🤖 Asistente Jurisprudencial con IA</h2>", unsafe_allow_html=True)
-    st.markdown("<p class='sub-header'>Formula consultas jurídicas en lenguaje natural. La IA analizará la biblioteca y citará las sentencias exactas.</p>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-header'>Formula consultas jurídicas en lenguaje natural. La IA analizará la biblioteca y estructurará la Ratio Decidendi con citas exactas.</p>", unsafe_allow_html=True)
     
     col_input, col_config = st.columns([3, 1])
     with col_input:
@@ -271,7 +333,7 @@ if menu == "🤖 Buscador Semántico IA":
         st.caption("El análisis evalúa corporación, radicado, fecha, tema y la argumentación registrada en la biblioteca.")
 
     if ejecutar_ia and consulta_usuario.strip():
-        with st.spinner("Analizando jurisprudencia y construyendo respuesta fundamentada..."):
+        with st.spinner("Analizando jurisprudencia y construyendo Ratio Decidendi..."):
             # 1. Preparar el contexto de la base de datos para la IA
             contexto_items = []
             cols_requeridas = ["Corporación", "Sala/Sección", "Tipo providencia", "Radicado", "Fecha providencia", "Tema", "Enlace", "Nombre copia"]
@@ -291,7 +353,7 @@ if menu == "🤖 Buscador Semántico IA":
             contexto_texto = "\n".join(contexto_items[:120])  # Primeras 120 providencias más relevantes
             
             prompt = f"""
-Eres un asistente jurídico experto en derecho público, disciplinario y contencioso administrativo en Colombia.
+Eres el Asistente Jurídico Oficial del Canal de Jurisprudencia de Nelson Arévalo, experto en derecho público, disciplinario y contencioso administrativo en Colombia.
 Analiza la siguiente pregunta del usuario y responde FUNDAMENTÁNDOTE ESTRICTAMENTE en la base de datos de providencias suministrada.
 
 Pregunta del usuario:
@@ -300,11 +362,12 @@ Pregunta del usuario:
 Base de Providencias y Doctrina Disponible:
 {contexto_texto}
 
-Instrucciones para tu respuesta:
-1. SÍNTESIS JURÍDICA: Explica con claridad técnica y rigor la tesis jurídica aplicable a la consulta.
-2. PROVIDENCIAS FUNDAMENTO: Cita de forma expresa las providencias de la lista que respaldan tu respuesta (menciona Corporación, Radicado, Fecha y Tema).
-3. ENLACES DIRECTOS: Si la providencia tiene un enlace en la lista, indícalo claramente con formato markdown [Ver Providencia](enlace) para que el suscriptor pueda abrir el archivo oficial.
-4. Si la base no contiene un caso idéntico, explica el precedente más cercano disponible sin inventar radicados ni normas.
+Instrucciones para la estructura de tu respuesta (Estilo Ratio Decidendi):
+1. RATIO DECIDENDI / TESIS CENTRAL: Explica de manera sintética, rigurosa y técnica la Regla de Decisión aplicable al caso.
+2. ANÁLISIS JURÍDICO DETALLADO: Desarrolla el fundamento dogmático y constitucional del problema planteado.
+3. PRECEDENTES APLICABLES (CITAS DIRECTAS): Cita expresamente las providencias que respaldan la tesis (Corporación, Radicado, Fecha y Tema).
+4. ENLACES OFICIALES: Incluye los enlaces en formato [Ver Providencia](enlace) para acceder al documento en Drive.
+5. Si la base no contiene un caso idéntico, explica el precedente más cercano disponible sin inventar radicados ni normas.
 """
             respuesta_texto = ""
             modelo_usado = None
@@ -368,10 +431,11 @@ Para activar el análisis dinámico en tiempo real con Gemini, agrega tu `GEMINI
                     link = m.get('Enlace', '#')
                     respuesta_texto += f"\n* **{m.get('Corporación')}** - Rad. `{m.get('Radicado')}` ({m.get('Fecha providencia')}): {m.get('Tema')} — [Abrir Documento en Drive]({link})"
 
-            # Mostrar respuesta
+            # Mostrar respuesta estructurada como Ratio Decidendi
             st.markdown("<div class='card-ia'>", unsafe_allow_html=True)
+            st.markdown("<h3 class='ratio-header'>📌 Ratio Decidendi & Anotación Jurisprudencial</h3>", unsafe_allow_html=True)
             if modelo_usado:
-                st.caption(f"⚡ *Respuesta generada mediante Gemini (`{modelo_usado}`)*")
+                st.caption(f"⚡ *Análisis generado mediante Gemini (`{modelo_usado}`) · Canal de Jurisprudencia*")
             st.markdown(respuesta_texto)
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -431,12 +495,12 @@ elif menu == "📚 Catálogo de Providencias":
         with st.container():
             st.markdown(f"""
             <div class='card-providencia'>
-                <div>
+                <div style='margin-bottom: 8px;'>
                     <span class='tag-corp'>{corp}</span>
                     <span class='tag-fecha'>📅 {fecha}</span>
-                    <span style='color: #718096; font-size: 0.85rem; margin-left: 8px;'>{tipo} · {sala}</span>
+                    <span style='color: #4A5568; font-size: 0.85rem; margin-left: 8px; font-weight: 500;'>{tipo} · {sala}</span>
                 </div>
-                <h4 style='color: #1A202C; margin-top: 8px; margin-bottom: 6px;'>Radicado: {rad}</h4>
+                <h4 style='color: #03053A; margin-top: 8px; margin-bottom: 6px; font-family: Georgia, serif;'>Radicado: {rad}</h4>
                 <p style='color: #2D3748; font-size: 0.95rem; margin-bottom: 8px;'><strong>Tema:</strong> {tema}</p>
                 <div style='font-size: 0.82rem; color: #718096;'>
                     <strong>Archivo:</strong> {nombre_copia}
