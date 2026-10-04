@@ -87,9 +87,10 @@ if not GEMINI_API_KEY and "GEMINI_API_KEY" in st.secrets:
 
 # Lista de modelos soportados para fallback dinámico
 GEMINI_MODELS_FALLBACK = [
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
     "gemini-1.5-flash-latest",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-pro",
     "gemini-pro"
 ]
 
